@@ -7,8 +7,6 @@ import csv
 def scrapLivre(urlLivres):
     #url à parser
     urlParser = urlLivres
-
-    #saisir l'url
     r = requests.get(urlParser)
     r.encoding='utf-8'
 
@@ -22,30 +20,21 @@ def scrapLivre(urlLivres):
 
     # extraire product_page_url
     infosLivre["product_page_url"] = urlParser
-
     # extraire titre
     titreLivre = soup.select_one('div.product_main > h1')
-    # print(titreLivre.text)
-    # print("==="*30)
     infosLivre["title"] = titreLivre.text
-    print(infosLivre)
-
-
+    # print(infosLivre)
     #liste celle pour récuperer le texte suivant
     tdList = []
     table = soup.find('table', {'class': 'table table-striped'})
     for td in table.find_all('td'):
         tdList.append(td.text)
-
     # extraire universal_product_code (upc)
     infosLivre["universal_product_code (upc)"] = tdList[0]
-
     # extraire price_excluding_tax
     infosLivre["price_excluding_tax"] = tdList[2]
-
     # extraire price_including_tax
     infosLivre["price_including_tax"] = tdList[3]
-
     # extraire number_available
     #stock en nombre
     stockAvailable=0
@@ -54,15 +43,12 @@ def scrapLivre(urlLivres):
         if match:
             stockAvailable=int(match.group())
     infosLivre["number_available"] = stockAvailable
-
     # extraire category
     category = soup.select('ul.breadcrumb > li > a')
     infosLivre["category"] = category[2].text
-
     # extraire review_rating
     rating = soup.find('p', class_='star-rating')['class'][1]
     infosLivre["review_rating"] = rating
-
     # extraire image_url
     image = soup.find('div', class_='item active').find('img')['src']
     image_url = urljoin('https://books.toscrape.com/', image)
@@ -73,89 +59,58 @@ def scrapLivre(urlLivres):
     infoLivre.append(infosLivre)
     return infoLivre
 
+
 #parser url catégorie
-urlCategorie = 'https://books.toscrape.com/catalogue/category/books/travel_2/index.html'
-r = requests.get(urlCategorie)
-r.encoding='utf-8'
-soup = BeautifulSoup(r.text, 'html.parser')
-#récupérer les url des livres
-livres = soup.find_all('h3')
-urlLivres = []
-for livre in livres:
-    urlLivre = livre.find('a')['href']
-    urlLivre = urljoin('https://books.toscrape.com/catalogue/', urlLivre)
-    urlLivres.append(urlLivre)
-#print(urlLivres)
-scrapLivre(urlLivres[0])
-print(scrapLivre(urlLivres[0]))
+urlCategorie = 'https://books.toscrape.com/catalogue/category/books/mystery_3/index.html'
+rcategorie = requests.get(urlCategorie)
+rcategorie.encoding='utf-8'
+soup = BeautifulSoup(rcategorie.text, 'html.parser')
 
-# #url à parser livre
-# urlParser = 'https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html'
+resultats = []
 
-# r = requests.get(urlParser)
-# r.encoding='utf-8'
+#gérer la pagination
+page = 1
+next_page =True
+while next_page:
+    url_page = f"{urlCategorie.replace('index.html','')}page-{page}.html"
+    response = requests.get(url_page)
+    response.encoding='utf-8'
+    html_page = response.text
+    soup = BeautifulSoup(html_page, 'html.parser')
+    next_button = soup.find('li', class_='next')
+    print(url_page)
+   
+    #récupérer les url des livres
+    livres = soup.find_all('h3')
+    urlLivres = []    
+    for livre in livres:
+        urlLivre = livre.find('a')['href']
+        # Utilise l'URL de la page catégorie comme base
+        urlLivre = urljoin(url_page, urlLivre)
+        urlLivres.append(urlLivre)
+    # print(urlLivres)
 
-# soup = BeautifulSoup(r.text, 'html.parser')
-# #print(soup.prettify())
+        info = {}
+    for url in urlLivres:
+        info = scrapLivre(url)
+        resultats.extend(info)
+    print(info)
 
-# #creation de la liste de récupération et de la bibliotheque
-# infoLivre=[]
-# infosLivre = {}
+    if next_button:
+        page += 1
+    else:
+        next_page = False
 
-# # extraire product_page_url
-# infosLivre["product_page_url"] = urlParser
+#sauvegarder les données dans un fichier CSV
+with open('livres.csv', mode='w', newline='', encoding='utf-8')as fichier_csv:
+    fieldnames = ["product_page_url", "universal_product_code (upc)", "title", "price_excluding_tax", "price_including_tax", "number_available", "category", "review_rating", "image_url"]
+    writer = csv.DictWriter(fichier_csv, fieldnames=fieldnames)
+    writer.writeheader()
+    for livre in resultats:
+        writer.writerow(livre)
+fichier_csv.close()
+print("Données sauvegardées dans livres.csv")
 
-# # extraire titre
-# titreLivre = soup.select_one('div.product_main > h1')
-# infosLivre["title"] = titreLivre.text
 
-# #liste celle pour récuperer le texte suivant
-# tdList = []
-# table = soup.find('table', {'class': 'table table-striped'})
-# for td in table.find_all('td'):
-#     tdList.append(td.text)
 
-# # extraire universal_product_code (upc)
-# infosLivre["universal_product_code (upc)"] = tdList[0]
-
-# # extraire price_excluding_tax
-# infosLivre["price_excluding_tax"] = tdList[2]
-
-# # extraire price_including_tax
-# infosLivre["price_including_tax"] = tdList[3]
-
-# # extraire number_available
-# #stock en nombre
-# stockAvailable=0
-# if tdList[5].startswith('In stock'):
-#     match=re.search(r"\d+",tdList[5])
-#     if match:
-#         stockAvailable=int(match.group())
-# infosLivre["number_available"] = stockAvailable
-
-# # extraire category
-# category = soup.select('ul.breadcrumb > li > a')
-# infosLivre["category"] = category[2].text
-
-# # extraire review_rating
-# rating = soup.find('p', class_='star-rating')['class'][1]
-# infosLivre["review_rating"] = rating
-
-# # extraire image_url
-# image = soup.find('div', class_='item active').find('img')['src']
-# image_url = urljoin('https://books.toscrape.com/', image)
-# infosLivre["image_url"] = image_url
-
-# # extraire description
-# description = soup.find('div', id='product_description')
-
-# print(infosLivre)
-# infoLivre.append(infosLivre)
-# #print (infoLivre)
-# with open("infosLivre.csv", "w", newline='', encoding='utf-8') as csvfile:
-#     fieldnames = ['product_page_url', 'title', 'universal_product_code (upc)', 'category', 'price_excluding_tax', 'price_including_tax', 'number_available', 'review_rating', 'image_url', 'description']
-#     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-#     writer.writeheader()
-#     writer.writerows(infoLivre)
-#     csvfile.close()
-# #print("Fichier CSV créé avec succès.")
+ 
