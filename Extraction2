@@ -59,57 +59,68 @@ def scrapLivre(urlLivres):
     infoLivre.append(infosLivre)
     return infoLivre
 
+def scrapCategorie(urlCategorie):
+    resultats = []
+    page = 1
+    next_page = True
 
-#parser url catégorie
-urlCategorie = 'https://books.toscrape.com/catalogue/category/books/mystery_3/index.html'
-rcategorie = requests.get(urlCategorie)
-rcategorie.encoding='utf-8'
-soup = BeautifulSoup(rcategorie.text, 'html.parser')
+    # Scrappe d'abord la page index.html
+    urlPage = urlCategorie
+    while next_page:
+        response = requests.get(urlPage)
+        response.encoding = 'utf-8'
+        soup = BeautifulSoup(response.text, 'html.parser')
+        next_button = soup.find('li', class_='next')
+        print(urlPage)
 
-resultats = []
+        # Récupérer les url des livres
+        livres = soup.find_all('h3')
+        urlLivres = []
+        for livre in livres:
+            urlLivre = livre.find('a')['href']
+            urlLivre = urljoin(urlPage, urlLivre)
+            urlLivres.append(urlLivre)
 
-#gérer la pagination
-page = 1
-next_page =True
-while next_page:
-    url_page = f"{urlCategorie.replace('index.html','')}page-{page}.html"
-    response = requests.get(url_page)
-    response.encoding='utf-8'
-    html_page = response.text
-    soup = BeautifulSoup(html_page, 'html.parser')
-    next_button = soup.find('li', class_='next')
-    print(url_page)
-   
-    #récupérer les url des livres
-    livres = soup.find_all('h3')
-    urlLivres = []    
-    for livre in livres:
-        urlLivre = livre.find('a')['href']
-        # Utilise l'URL de la page catégorie comme base
-        urlLivre = urljoin(url_page, urlLivre)
-        urlLivres.append(urlLivre)
-    # print(urlLivres)
+        for url in urlLivres:
+            info = scrapLivre(url)
+            resultats.extend(info)
 
-        info = {}
-    for url in urlLivres:
-        info = scrapLivre(url)
-        resultats.extend(info)
-    print(info)
+        if next_button:
+            page += 1
+            # Génère l'URL de la page suivante
+            urlPage = urlCategorie.replace('index.html', f'page-{page}.html')
+        else:
+            next_page = False
 
-    if next_button:
-        page += 1
-    else:
-        next_page = False
+    # Sauvegarde CSV
+    with open('livres.csv', mode='w', newline='', encoding='utf-8') as fichier_csv:
+        fieldnames = ["product_page_url", "universal_product_code (upc)", "title", "price_excluding_tax", "price_including_tax", "number_available", "category", "review_rating", "image_url"]
+        writer = csv.DictWriter(fichier_csv, fieldnames=fieldnames)
+        writer.writeheader()
+        for livre in resultats:
+            writer.writerow(livre)
+    print("Données sauvegardées dans livres.csv")
+    return resultats
 
-#sauvegarder les données dans un fichier CSV
-with open('livres.csv', mode='w', newline='', encoding='utf-8')as fichier_csv:
-    fieldnames = ["product_page_url", "universal_product_code (upc)", "title", "price_excluding_tax", "price_including_tax", "number_available", "category", "review_rating", "image_url"]
-    writer = csv.DictWriter(fichier_csv, fieldnames=fieldnames)
-    writer.writeheader()
-    for livre in resultats:
-        writer.writerow(livre)
-fichier_csv.close()
-print("Données sauvegardées dans livres.csv")
+# scrap du site books to scraps
+urlSite = "https://books.toscrape.com/index.html"
+rSite = requests.get(urlSite)
+rSite.encoding ='utf-8'
+soupSite = BeautifulSoup(rSite.text, 'html.parser')
+
+#récupérer les url du catalogue
+urlCatagories =[]
+catalogue = soupSite.find('ul', class_="nav-list")
+for link in catalogue.find_all('a'):
+    urlRecups = link.get('href')
+    urlRecup = urljoin(urlSite, urlRecups)
+    urlCatagories.append(urlRecup)
+del urlCatagories[0]
+
+
+#parcourir les categories
+for url in urlCatagories:
+    infos = scrapCategorie(url)
 
 
 
